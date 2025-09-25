@@ -13,10 +13,9 @@ services:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   backend:
-    image: your-dockerhub-username/qb-backend:latest
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ./backend
+      dockerfile: Dockerfile
     restart: always
     environment:
       DATABASE_HOST: db
@@ -30,10 +29,9 @@ services:
       - "5000:5000"
 
   frontend:
-    image: your-dockerhub-username/qb-frontend:latest
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      context: ./frontend
+      dockerfile: Dockerfile
     restart: always
     depends_on:
       - backend
@@ -42,3 +40,4 @@ services:
 
 volumes:
   db_data:
+

@@ -3,10 +3,17 @@ FROM node:18
 
 WORKDIR /app
 
-COPY backend/package*.json ./
+# Copy package.json and package-lock.json first
+COPY package*.json ./
+
+# Install only production dependencies
 RUN npm install --only=production
 
-COPY backend/ .
+# Copy all backend source files
+COPY . .
 
 EXPOSE 5000
+
+# Start the backend
 CMD ["npm", "start"]
+
