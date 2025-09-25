@@ -1,0 +1,152 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QB Healthcare</title>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; margin:0; padding:0; background:#f7fbff; color:#0f172a; }
+    header { background:#0369a1; color:white; padding:20px 24px; display:flex; justify-content:space-between; align-items:center; }
+    .container { max-width:1100px; margin:28px auto; padding:0 16px; }
+    .card { background:white; border-radius:12px; padding:18px; box-shadow:0 6px 18px rgba(2,6,23,0.06); }
+    .grid { display:grid; gap:16px; grid-template-columns: 1fr 360px; align-items:start; }
+    .btn { background:#0369a1; color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; }
+    .list { margin-top:12px; }
+    .item { padding:10px; border-bottom:1px solid #eef2ff; }
+    label { font-weight:600; font-size:14px; display:block; margin-bottom:6px; }
+    input, select { width:100%; padding:8px 10px; border-radius:8px; border:1px solid #e6eef8; }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex; gap:14px; align-items:center;">
+      <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.5'><path d='M12 2v6'/><path d='M5 9h14'/><circle cx='12' cy='14' r='6'/></svg>" alt="logo" />
+      <div><strong style="font-size:18px;">QB Healthcare</strong><div style="font-size:12px; opacity:0.85">Doctor & Patient portal</div></div>
+    </div>
+    <nav>
+      <button class="btn" onclick="showNewAppt()">New Appointment</button>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h3>Appointments</h3>
+          <div id="appointments" class="list">Loading...</div>
+        </div>
+
+        <div style="height:18px"></div>
+
+        <div class="card">
+          <h3>Patients</h3>
+          <div id="patients" class="list">Loading...</div>
+        </div>
+      </div>
+
+      <aside>
+        <div class="card">
+          <h3>New Appointment</h3>
+          <div style="margin-top:8px;">
+            <label>Patient</label>
+            <select id="patientSelect"></select>
+            <label style="margin-top:8px;">Doctor</label>
+            <select id="doctorSelect"></select>
+            <label style="margin-top:8px;">Starts at</label>
+            <input id="startsAt" type="datetime-local" />
+            <label style="margin-top:8px;">Ends at</label>
+            <input id="endsAt" type="datetime-local" />
+            <label style="margin-top:8px;">Reason</label>
+            <input id="reason" type="text" />
+            <div style="margin-top:10px; display:flex; gap:8px;">
+              <button class="btn" onclick="createAppointment()">Book</button>
+              <button onclick="hideNewAppt()" style="padding:10px;border-radius:8px;">Cancel</button>
+            </div>
+            <div id="apptMsg" style="margin-top:8px; color:green"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+<script>
+const API = '/api'; // frontend proxies to backend because compose maps ports; when testing, use http://localhost:5000
+
+async function fetchJSON(path) {
+  const base = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:5000' : '';
+  const url = base + path;
+  const res = await fetch(url);
+  return res.json();
+}
+
+async function load() {
+  try {
+    const appts = await fetchJSON('/api/appointments');
+    const patients = await fetchJSON('/api/patients');
+    const doctors = await fetchJSON('/api/doctors');
+
+    const apptEl = document.getElementById('appointments');
+    apptEl.innerHTML = '';
+    appts.forEach(a => {
+      const el = document.createElement('div');
+      el.className='item';
+      el.innerHTML = '<strong>' + (new Date(a.starts_at)).toLocaleString() + '</strong> &middot; ' + a.patient + ' with ' + (a.doctor || 'TBD') + '<div style="opacity:0.8;">' + (a.reason||'') + '</div>';
+      apptEl.appendChild(el);
+    });
+
+    const patientsEl = document.getElementById('patients');
+    patientsEl.innerHTML = '';
+    patients.forEach(p => {
+      const el = document.createElement('div');
+      el.className='item';
+      el.innerHTML = '<strong>' + p.full_name + '</strong><div style="opacity:0.8;">' + (p.email||'') + '</div>';
+      patientsEl.appendChild(el);
+    });
+
+    // populate selects
+    const psel = document.getElementById('patientSelect');
+    psel.innerHTML = ''; patients.forEach(p => psel.innerHTML += `<option value="${p.id}">${p.full_name}</option>`);
+    const dsel = document.getElementById('doctorSelect');
+    dsel.innerHTML = ''; doctors.forEach(d => dsel.innerHTML += `<option value="${d.id}">${d.full_name} (${d.speciality||''})</option>`);
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function createAppointment() {
+  const patient_id = document.getElementById('patientSelect').value;
+  const doctor_id = document.getElementById('doctorSelect').value;
+  const starts_at = document.getElementById('startsAt').value;
+  const ends_at = document.getElementById('endsAt').value;
+  const reason = document.getElementById('reason').value;
+  try {
+    const res = await fetch('http://localhost:5000/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patient_id, doctor_id, starts_at, ends_at, reason })
+    });
+    if (res.status === 201) {
+      document.getElementById('apptMsg').innerText = 'Appointment created.';
+      setTimeout(()=> document.getElementById('apptMsg').innerText = '', 3000);
+      load();
+    } else {
+      const data = await res.json();
+      document.getElementById('apptMsg').innerText = 'Error: ' + (data.error || res.status);
+      document.getElementById('apptMsg').style.color = 'red';
+    }
+  } catch (err) {
+    console.error(err);
+    document.getElementById('apptMsg').innerText = 'Network error';
+    document.getElementById('apptMsg').style.color = 'red';
+  }
+}
+
+function showNewAppt(){ window.scrollTo({ top: 0, behavior: 'smooth' }); document.getElementById('startsAt').focus(); }
+function hideNewAppt(){ /* noop for demo */ }
+
+load();
+</script>
+</body>
+</html>
